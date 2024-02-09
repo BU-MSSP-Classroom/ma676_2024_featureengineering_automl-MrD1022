@@ -215,15 +215,16 @@ When the predictor is right skewed they tend to distort the linear model by exhi
 p = ggplot(ames_raw) + geom_point() + 
   aes(x = `Gr Liv Area`, y = SalePrice) + 
   xlab("Above grade (ground) living area square feet") + 
-  ylab("Sale Price") + geom_smooth(method="lm", se=FALSE)
-p2 <- ggMarginal(p, margins = 'both', fill="skyblue", size=4,type="histogram")
+  ylab("Sale Price") + geom_smooth(method = "lm", se = FALSE)
+p2 <- ggMarginal(p, margins = 'both', fill="skyblue", size=4, type = "histogram")
 
 
 p4 = ggplot(ames_raw) + geom_point() + 
   aes(x = `Gr Liv Area`, y = SalePrice) + 
   xlab("Above grade (ground) living area square feet") + 
-  ylab("Sale Price") + geom_smooth(method="lm",se=FALSE)+scale_y_log10()+scale_x_log10()
-p3 <- ggMarginal(p4, margins = 'both', fill="skyblue", size=4,type="histogram")
+  ylab("Sale Price") + geom_smooth(method = "lm",se = FALSE) +
+  scale_y_log10() + scale_x_log10() # log transformation
+p3 <- ggMarginal(p4, margins = 'both', fill="skyblue", size=4, type = "histogram")
 
 gridExtra::grid.arrange(p2,p3,ncol=2)
 ```
@@ -297,7 +298,7 @@ Alternatively, you could compress the correlated variable using dimension reduct
 ```{r}
 BiocManager::install("pcaMethods")
 library(pcaMethods)
-
+# Principal Component Analysis
 pca_numeric<-pcaMethods::pca(numeric_vars,nPcs=20,scale="uv")
 summary(pca_numeric)
 plot(pca_numeric)
@@ -335,51 +336,114 @@ You will use the framework of tidymodel workflow, which will run these transform
 ## In class work
 ### Model fitting
 
-Since you've worked on it in MA679 please copy and paste your best model here.  
+Since you've worked on it in MA679 please copy and paste your best model here.
+
+Your answer:
+
 ```{r,echo=TRUE}
 lmfit_2008 <- lm(log(SalePrice) ~ `Year Built` + `Year Remod/Add` + 
                      `Gr Liv Area` * `Total Bsmt SF` + `Garage Area` + 
                      I(`Total Bsmt SF`^2) + I(`Total Bsmt SF`^3), data = ames_raw_2008)
-
+summary(lmfit_2008)
 ```
 
-Your answer:
 
-~~~
-Please write your answer in full sentences.
-
-
-~~~
 
 Please perform feature engineering on the Ames housing data that you think will help with the prediction.
 
 ```{r,echo=TRUE}
-##
-##
+# Outliers
+#table(ames_raw_2008$`Lot Area`) discrete numeric
+par(mfrow=c(2,3))
+plot(ames_raw_2008$`Gr Liv Area`, ames_raw_2008$`Total Bsmt SF`)
+
+# Study variables
+#ames_raw$Electricity <- 
+#table(ames_raw$Utilities) almost all houses are equipped with EGWS
+#table(ames_raw_2008$Utilities) training set doesn't contain NoSewr/NoSeWa houses (n = 3)
+#table(ames_raw_2008$Street)
+#table(ames_raw_2008$`Land Contour`)
+#table(ames_raw_2008$Functional)
+table(ames_raw_2008$Foundation)
+table(ames_raw_2008$`Overall Qual`)
+ggplot(ames_raw_2008) + geom_histogram() + aes(x = `Overall Qual`)
+plot(ames_raw_2008$`Overall Qual`, log(ames_raw_2008$SalePrice))
+table(ames_raw_2008$`Overall Cond`)
+ggplot(ames_raw_2008) + geom_histogram() + aes(x = `Overall Cond`)
+
+# feature selection: Bsmt
+
+ames_raw$`BsmtFin Type 1` <- factor(ames_raw$`BsmtFin Type 1`)
+ames_raw$`BsmtFin Type 1` <- ifelse(is.na(ames_raw$`BsmtFin Type 1`), 0, ames_raw$`BsmtFin Type 1`)
+ames_raw$`Bsmt I score` <- ames_raw$`BsmtFin Type 1` * ames_raw$`BsmtFin SF 1`
+
+ames_raw$`BsmtFin Type 2` <- factor(ames_raw$`BsmtFin Type 2`)
+ames_raw$`BsmtFin Type 2` <- ifelse(is.na(ames_raw$`BsmtFin Type 2`), 0, ames_raw$`BsmtFin Type 2`)
+ames_raw$`Bsmt II score` <- ames_raw$`BsmtFin Type 2` * ames_raw$`BsmtFin SF 2`
+
+# code categorical: Foundation, Bsmt Qual/Cond
+ames_raw$Foundation_fac<-factor(ames_raw$Foundation)
+ames_raw$`Bsmt Qual`<-ifelse(is.na(ames_raw$`Bsmt Qual`), 0, ames_raw$`Bsmt Qual`)
+ames_raw$`Bsmt Qual_fac`<-factor(ames_raw$`Bsmt Qual`)
+table(ames_raw$`Bsmt Qual_fac`)
+
+ames_raw$`Bsmt Cond`<-ifelse(is.na(ames_raw$`Bsmt Cond`), 0, ames_raw$`Bsmt Cond`)
+ames_raw$`Bsmt Cond_fac`<-factor(ames_raw$`Bsmt Cond`)
+table(ames_raw$`Bsmt Cond_fac`)
+
+ames_raw$`Garage Type`<-ifelse(is.na(ames_raw$`Garage Type`), 0, ames_raw$`Garage Type`)
+ames_raw$`Garage Type_fac`<-factor(ames_raw$`Garage Type`)
+
+ames_raw$`Garage Finish`<-ifelse(is.na(ames_raw$`Garage Finish`), 0, ames_raw$`Garage Finish`)
+ames_raw$`Garage Finish_fac`<-factor(ames_raw$`Garage Finish`)
+
+# Remember to involve Garage Cars
+ames_raw$`Garage Cond`<-ifelse(is.na(ames_raw$`Garage Cond`), 0, ames_raw$`Garage Cond`)
+ames_raw$`Garage Cond_fac`<-factor(ames_raw$`Garage Cond`)
+
+# grouping
+ames_raw$`Overall Qual2` <- ifelse(ames_raw$`Overall Qual` < 3, 3, ames_raw$`Overall Qual`)
+
+
+
 ```
 
 Your answer:
 
 ~~~
-Please write your answer in full sentences.
+Predictor descriptions: https://jse.amstat.org/v19n3/decock/DataDocumentation.txt
 
+My 679 model contains only numerical variables since they are easily understood from a correlation map. Here I want to include more features about basement(Bsmt), garage, also adding Foundation and Overall rates (Overall Qual, Overall Cond). I checked several variables finding these are less over represented by specific types.
 
 ~~~
 
 Compare the result before and after the feature engineering step.
 
 ```{r,echo=TRUE}
-##
-##
+ames_raw_2008=ames_raw[ames_raw$`Yr Sold`<2008,]
+ames_raw_2009=ames_raw[ames_raw$`Yr Sold`>=2008,]
+
+lmfit_2008_FE <- lm(log(SalePrice) ~ `Year Built` + `Year Remod/Add` + 
+                     `Gr Liv Area` * `Total Bsmt SF` + `Garage Area` + 
+                      Foundation_fac + `Bsmt I score` + `Bsmt II score` +
+                      `Bsmt Qual_fac` * `Bsmt Cond_fac` + 
+                      `Garage Type_fac` * `Garage Cond_fac` * `Garage Finish_fac` +
+                      `Overall Qual2` + `OverallCond3` +
+                     I(`Total Bsmt SF`^2) + I(`Total Bsmt SF`^3), data = ames_raw_2008)
+summary(lmfit_2008_FE)
+plot(residuals(lmfit_2008_FE))
+# table(ames_raw_2009$`Bsmt Qual_fac`)
+# ames_raw_2009 <- ames_raw_2009 |> filter(`Bsmt Qual_fac` != "Po")
+# pred <- predict(lmfit_2008_FE, ames_raw_2009)
+# calc_loss(pred, log(ames_raw_2009$SalePrice))
 ```
 
 
 Your answer:
 
 ~~~
-Please write your answer in full sentences.
-
-
+This model failed to predict since a new category (Po in Bsmt Qual_fac) in 2009 data is not shown in training set.
+After removing poor quality basement from test set, loss function return NAs, i need to spend some time figure out reasons
 ~~~
 
 ## AutoML 
@@ -413,8 +477,8 @@ https://a-hanf.github.io/useR_presentation/useR_2021_mlr3automl.pdf
 
 You will need to install
 ```{r,eval=FALSE}
-devtools::install_github('https://github.com/mlr-org/mlr3extralearners')
-devtools::install_github('https://github.com/a-hanf/mlr3automl', dependencies = TRUE)
+# devtools::install_github('https://github.com/mlr-org/mlr3extralearners')
+# devtools::install_github('https://github.com/a-hanf/mlr3automl', dependencies = TRUE)
 ```
 
 ```{r,eval=FALSE}
